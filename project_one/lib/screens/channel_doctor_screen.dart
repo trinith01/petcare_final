@@ -113,7 +113,7 @@ class ChannelDoctorScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: AssetImage('assets/images/doctor_$index.jpg'),
+                    backgroundImage: AssetImage('assets/images/doctor_one.jpeg'),
                   ),
                   SizedBox(width: 12),
                   Expanded(

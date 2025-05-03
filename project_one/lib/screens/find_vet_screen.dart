@@ -30,7 +30,7 @@ class _FindVetScreenState extends State<FindVetScreen> {
 
   Future<void> _checkApiKeyAndLocation() async {
     // Check if API key is provided
-    if (apiKey == null || apiKey!.isEmpty || apiKey == 'YOUR_GOOGLE_MAPS_API_KEY') {
+    if (apiKey == null || apiKey!.isEmpty || apiKey == 'AIzaSyCVRj27DSJKoWjBtnvHKUZptljkGvqHZkQ') {
       setState(() {
         _isLoading = false;
         _errorMessage = 'Google Maps API key not configured';
@@ -90,7 +90,7 @@ class _FindVetScreenState extends State<FindVetScreen> {
   }
 
   Future<void> _fetchNearbyVets(double lat, double lng) async {
-    if (apiKey == null || apiKey!.isEmpty || apiKey == 'YOUR_GOOGLE_MAPS_API_KEY') {
+    if (apiKey == null || apiKey!.isEmpty || apiKey == 'AIzaSyCVRj27DSJKoWjBtnvHKUZptljkGvqHZkQ') {
       return; // Don't attempt API call without valid key
     }
     
@@ -150,7 +150,7 @@ class _FindVetScreenState extends State<FindVetScreen> {
   }
 
   Future<void> _showPlaceDetails(String placeId) async {
-    if (apiKey == null || apiKey!.isEmpty || apiKey == 'YOUR_GOOGLE_MAPS_API_KEY') {
+    if (apiKey == null || apiKey!.isEmpty || apiKey == 'AIzaSyCVRj27DSJKoWjBtnvHKUZptljkGvqHZkQ') {
       return; // Don't attempt API call without valid key
     }
     

@@ -24,7 +24,8 @@ class _AppState extends State<App> {
     ProfileScreen(),
     MedicalRecordsScreen(),
     VaccinationsScreen(),
-    FindVetScreen(),
+    FindvetScreen(),
+    
     ChannelDoctorScreen(),
     DogFoodStoreScreen(),
   ];

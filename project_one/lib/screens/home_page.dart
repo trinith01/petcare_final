@@ -51,7 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ProfileScreen(),
           MedicalRecordsScreen(),
           VaccinationsScreen(),
-          FindVetScreen(),
+          FindvetScreen(),
+    
           DogFoodStoreScreen(),
           ChannelDoctorScreen()
         ],

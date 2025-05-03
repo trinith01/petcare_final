@@ -44,7 +44,7 @@ class LandingPage extends StatelessWidget {
                   ),
                   // Pets and food image
                   Image.asset(
-                    'assets/images/log.jpg',
+                    'assets/images/logo.jpg',
                     height: 260,
                     fit: BoxFit.contain,
                   ),

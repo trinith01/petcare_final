@@ -1,231 +1,169 @@
-import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
-class FindvetScreen extends StatefulWidget {
+class rider_profile extends StatefulWidget {
   @override
-  _FindvetScreenState createState() => _FindvetScreenState();
+  _rider_profileState createState() => _rider_profileState();
 }
 
-class _FindvetScreenState extends State<FindvetScreen> {
-  static const _apiKey = 'AIzaSyCVRj27DSJKoWjBtnvHKUZptljkGvqHZkQ';
-  final Completer<GoogleMapController> _mapController = Completer();
-  Position? _currentPosition;
-  List<Place> _places = [];
+class _rider_profileState extends State<rider_profile> {
+  late GoogleMapController _mapController;
   Set<Marker> _markers = {};
+LatLng? _currentPosition;
+  bool _isLoading = false;
+
+  // Function to get the current location
+
+  Future<void> _getCurrentLocation() async {
+    LocationPermission permission;
+
+    // Check if permission is granted
+    permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        // Show a message or fallback UI
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Location permission denied')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      // Permissions are denied forever, show dialog or settings prompt
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Permission Permanently Denied'),
+            content: Text('Location permissions are permanently denied. Please enable them from settings.'),
+            actions: [
+              TextButton(
+                child: Text('OK'),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // If permission is granted, get the current location
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+      if (mounted) {
+        setState(() {
+          _currentPosition = LatLng(position.latitude, position.longitude);
+        });
+        _getNearbyPetCareShops(_currentPosition!);
+      }
+    } catch (e) {
+      print('Failed to get location: $e');
+    }
+  }
+
+  // Function to get nearby pet care shops using Google Places API
+  Future<void> _getNearbyPetCareShops(LatLng currentPosition) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Replace with your own Google Places API Key
+    String apiKey = 'AIzaSyCVRj27DSJKoWjBtnvHKUZptljkGvqHZkQ';
+    String url =
+        'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${currentPosition.latitude},${currentPosition.longitude}&radius=30000&type=pet_store&key=$apiKey';
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      var data = json.decode(response.body);
+      List results = data['results'] as List;
+
+      if (mounted) {
+        setState(() {
+          _markers.clear();
+          for (var result in results) {
+            var lat = result['geometry']['location']['lat'];
+            var lng = result['geometry']['location']['lng'];
+            _markers.add(Marker(
+              markerId: MarkerId(result['place_id'].toString()),
+              position: LatLng(double.parse(lat.toString()), double.parse(lng.toString())),
+              infoWindow: InfoWindow(
+                title: result['name'].toString(),
+                snippet: result['vicinity'].toString(),
+              ),
+            ));
+          }
+          _isLoading = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      print('Failed to load pet care shops');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _initLocationAndFetch();
+    _getCurrentLocation();
   }
 
-  Future<void> _initLocationAndFetch() async {
-    // 1. Check current permission status
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    // 2. If denied, request it
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    // 3a. If still denied, inform the user and stop
-    if (permission == LocationPermission.denied) {
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text('Permission required'),
-          content: Text(
-            'Location permission is required to find nearby vet clinics. '
-            'Please allow location access.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    // 3b. If permanently denied, prompt to open settings
-    if (permission == LocationPermission.deniedForever) {
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text('Permission required'),
-          content: Text(
-            'Location permission has been permanently denied. '
-            'Please enable it from the app settings.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Geolocator.openAppSettings();
-                Navigator.of(context).pop();
-              },
-              child: Text('Open Settings'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    // 4. Permission granted – get the current position
-    try {
-      _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-    } catch (e) {
-      print('Error getting location: $e');
-      return;
-    }
-
-    // 5. Finally, fetch nearby vet clinics
-    await _fetchNearbyVets();
-  }
-
-  Future<void> _fetchNearbyVets() async {
-    if (_currentPosition == null) return;
-
-    final url = Uri.https(
-      'maps.googleapis.com',
-      '/maps/api/place/nearbysearch/json',
-      {
-        'location':
-            '${_currentPosition!.latitude},${_currentPosition!.longitude}',
-        'radius': '2000',                  // 2 km radius
-        'type': 'veterinary_care',         // vet-care hospitals
-        'key': _apiKey,
-      },
-    );
-
-    final response = await http.get(url);
-    final data = json.decode(response.body);
-
-    if (data['status'] == 'OK') {
-      final results = data['results'] as List;
-      _places = results.map((j) => Place.fromJson(j)).toList();
-
-      _markers = _places.map((p) {
-        return Marker(
-          markerId: MarkerId(p.placeId),
-          position: LatLng(p.lat, p.lng),
-          infoWindow: InfoWindow(title: p.name, snippet: p.vicinity),
-        );
-      }).toSet();
-
-      setState(() {});
-    } else {
-      print('Places API error: ${data['status']}');
-    }
+  @override
+  void dispose() {
+    // Clean up resources
+    _mapController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final initialCamera = CameraPosition(
-      target: _currentPosition != null
-          ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
-          : LatLng(0, 0),
-      zoom: 14,
-    );
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "Find Nearbly Vet Care Centers",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Color(0xFF4CAF50), // Green theme
-        centerTitle: true,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        ),
+        title: Text("Pet Care Shops Nearby"),
       ),
-      body: _currentPosition == null
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Google Map view
-                Expanded(
-                  flex: 2,
-                  child: GoogleMap(
-                    initialCameraPosition: initialCamera,
-                    myLocationEnabled: true,
-                    markers: _markers,
-                    onMapCreated: (controller) =>
-                        _mapController.complete(controller),
-                  ),
-                ),
-                // Scrollable list of vets
-                Expanded(
-                  flex: 1,
-                  child: ListView.builder(
-                    itemCount: _places.length,
-                    itemBuilder: (ctx, i) {
-                      final place = _places[i];
-                      return ListTile(
-                        leading: Icon(Icons.local_hospital),
-                        title: Text(place.name),
-                        subtitle: Text(place.vicinity),
-                        onTap: () async {
-                          final ctrl = await _mapController.future;
-                          ctrl.animateCamera(
-                            CameraUpdate.newLatLng(
-                              LatLng(place.lat, place.lng),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
+      body:(_isLoading || _currentPosition == null)
+        ? Center(child: CircularProgressIndicator())
+        : GoogleMap(
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            initialCameraPosition: CameraPosition(
+              target: _currentPosition!,
+              zoom: 14.0,
             ),
-    );
-  }
-}
-
-/// Model for a Place from Google Places API
-class Place {
-  final String placeId;
-  final String name;
-  final String vicinity;
-  final double lat;
-  final double lng;
-
-  Place({
-    required this.placeId,
-    required this.name,
-    required this.vicinity,
-    required this.lat,
-    required this.lng,
-  });
-
-  factory Place.fromJson(Map<String, dynamic> json) {
-    final loc = json['geometry']['location'];
-    return Place(
-      placeId: json['place_id'],
-      name: json['name'],
-      vicinity: json['vicinity'],
-      lat: loc['lat'],
-      lng: loc['lng'],
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+          ),
+          
+          
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
     );
   }
 }
